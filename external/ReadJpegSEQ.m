@@ -1,4 +1,4 @@
-function [ImageCellArray, headerInfo] = ReadJpegSEQ(fileName,frames)
+function [ImageCellArray, headerInfo] = ReadJpegSEQ(fileName,frames,options)
 % -------------------------------------------------------------------------
 % Read compressed or uncompressed NorPix image sequence in MATLAB.
 % This script can read all frames or a set reading window.
@@ -43,6 +43,12 @@ function [ImageCellArray, headerInfo] = ReadJpegSEQ(fileName,frames)
 % Please report any bugs and improvement suggestions!
 % -------------------------------------------------------------------------
 
+arguments
+    fileName = '';
+    frames = [1 1];
+    options.vendorSpecific = '';
+end
+
 %% Open Sequence & Read Information
 fid = fopen(fileName,'r','b'); % open the sequence
 assert(fid > 0,['File not found: ' fileName])
@@ -58,7 +64,16 @@ headerInfo.ImageSizeBytes = imageInfo(5);
 vals = [0,100,101,200:100:600,610,620,700,800,900];
 fmts = {'Unknown','Monochrome','Raw Bayer','BGR','Planar','RGB',...
     'BGRx', 'YUV422', 'YUV422_20', 'YUV422_PPACKED', 'UVY422', 'UVY411', 'UVY444'};
-headerInfo.ImageFormat = fmts{vals == imageInfo(6)};
+
+if ~isempty(options.vendorSpecific)
+    switch options.vendorSpecific
+        case 'BrightWay'
+            headerInfo.ImageFormat = 'BrightWay';
+    end
+else
+    headerInfo.ImageFormat = fmts{vals == imageInfo(6)};
+end
+
 fseek(fid,572,'bof');
 headerInfo.AllocatedFrames = fread(fid,1,'ushort',endianType);
 fseek(fid,620,'bof');
@@ -87,6 +102,8 @@ if strcmp(headerInfo.ImageFormat,'Monochrome')
     fprintf('Proceeding with image format %s.\n', headerInfo.ImageFormat)
 elseif strcmp(headerInfo.ImageFormat,'BGR')
     fprintf('Proceeding with image format %s.\n', headerInfo.ImageFormat)
+elseif strcmp(headerInfo.ImageFormat,'BrightWay')
+    fprintf('Trying BrightWay code...\n');
 else
     fprintf('Current image format (%s) was not tested and may not work! \n', headerInfo.ImageFormat)
     fprintf('Tested: %s\n', ...
@@ -257,10 +274,23 @@ function I = ReadUncompressedFrameWithoutIdx(fid, readStart, headerInfo, bitDept
 endianType = 'ieee-le';
 
 % read uncompressed image
+% THIS SEEMS WRONG, as we are reading the header as data
+% Need to see someplace more interesting:
 fseek(fid,readStart,'bof');
-vec = fread(fid, headerInfo.ImageSizeBytes, bitDepth, endianType);
 
-if strcmp(headerInfo.ImageFormat,'Monochrome')
+if isequal(headerInfo.ImageFormat, 'BrightWay')
+    % Intensity Hack
+    precision = 'uint8';
+    endianType = 'ieee-be';
+    vec = fread(fid, headerInfo.ImageSizeBytes/2, precision, 1);
+else
+    bitDepth = 'uint16';
+    endianType = 'ieee-le';
+    vec = fread(fid, headerInfo.ImageSizeBytes, bitDepth, endianType);
+end
+
+if strcmp(headerInfo.ImageFormat,'Monochrome') ...
+        || strcmp(headerInfo.ImageFormat,'BrightWay')
     I{1,1} = uint8(reshape(vec,headerInfo.ImageWidth,headerInfo.ImageHeight)');
 elseif strcmp(headerInfo.ImageFormat,'BGR')
     B = reshape(vec(1:3:end,1),headerInfo.ImageWidth,headerInfo.ImageHeight)';
