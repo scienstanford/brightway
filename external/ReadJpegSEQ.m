@@ -289,8 +289,6 @@ function I = ReadUncompressedFrameWithoutIdx(fid, readStart, headerInfo, bitDept
 endianType = 'ieee-le';
 
 % read uncompressed image
-% THIS SEEMS WRONG, as we are reading the header as data
-% Need to see someplace more interesting:
 fseek(fid,readStart,'bof');
 
 if isequal(headerInfo.ImageFormat, 'BrightWay')
