@@ -1,14 +1,16 @@
 function [ImageCellArray, headerInfo] = ReadJpegSEQ(fileName,frames,options)
 % -------------------------------------------------------------------------
-% Read compressed or uncompressed NorPix image sequence in MATLAB.
+% Read some compressed or uncompressed NorPix image sequence in MATLAB.
 % This script can read all frames or a set reading window.
-% Index file will be used if available and named as the source file
+% An index file will be used if available and has the same name as the source file
 % (eg. test.seq.idx). Otherwise the script will skip through a compressed
 % sequence from the beginning (may take some time).
 % 
 % INPUTS
 %    fileName:       Char containing the full path to the sequence
 %    frames:         1x2 double array of beginning and end frame
+%    options.vendorSpecific: 'BrightWay' for its files
+%
 % OUTPUTS
 %    ImageCellArray: Cell array with images and timestamps of all allocated
 %                    frames.
@@ -27,9 +29,12 @@ function [ImageCellArray, headerInfo] = ReadJpegSEQ(fileName,frames,options)
 %    Include sequence header information:
 %    [I, headerInfo] = ReadJpegSEQ('C:\test.seq',[1 1])
 % 
-% Last modified 05.11.2021 by Paul Siefert, PhD
-% Goethe-University Frankfurt
-% siefert@bio.uni-frankfurt.de
+%    Read a BrightWay Vision Intensity file:
+%    [I, headerInfo] = ReadJpegSEQ('test.seq',[1 1], 'vendorSpecific',
+%    'BrightWay');
+%
+% Modified 05.11.2021 by Paul Siefert, PhD
+% Goethe-University Frankfurt, siefert@bio.uni-frankfurt.de
 % 
 % Based on the work of Brett Shoelson (Norpix2MATLAB_MarksMod.m)
 % Thanks to NorPix support for providing sequence information.
@@ -39,9 +44,19 @@ function [ImageCellArray, headerInfo] = ReadJpegSEQ(fileName,frames,options)
 % 8-bit monochrome uncompressed (03.06.2019)
 % 8-bit(24) BGR 75% lossy jpeg compressed (04.10.2021)
 % Code for RGB included but not tested!
-% 
-% Please report any bugs and improvement suggestions!
-% -------------------------------------------------------------------------
+%
+% Adapted for BrightWay file -- D. Cardinal, Stanford University, 2022
+%   Push a vendor-specific format for BrightWay intensity only files
+%   that are tagged as YCC, but have no color info.
+%
+%   Looking at adding true YCC support in case it get used in future.
+%   In the meantime, here are the formulas I've found:
+%{
+  yMult = 298.083 * (Y / 256)
+  Red = yMult + (408.583 * CR / 256) - 222.291
+  Green = yMult - (100.291 * CB / 256) - (208.120 * CR / 256) + 135.576
+  Blue = yMult + (516.412 * CB / 256) - 276.836
+%}
 
 arguments
     fileName = '';
