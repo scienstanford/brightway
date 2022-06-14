@@ -1,14 +1,16 @@
-function [ImageCellArray, headerInfo] = ReadJpegSEQ(fileName,frames)
+function [ImageCellArray, headerInfo] = ReadJpegSEQ(fileName,frames,options)
 % -------------------------------------------------------------------------
-% Read compressed or uncompressed NorPix image sequence in MATLAB.
+% Read some compressed or uncompressed NorPix image sequence in MATLAB.
 % This script can read all frames or a set reading window.
-% Index file will be used if available and named as the source file
+% An index file will be used if available and has the same name as the source file
 % (eg. test.seq.idx). Otherwise the script will skip through a compressed
 % sequence from the beginning (may take some time).
 % 
 % INPUTS
 %    fileName:       Char containing the full path to the sequence
 %    frames:         1x2 double array of beginning and end frame
+%    options.vendorSpecific: 'BrightWay' for its files
+%
 % OUTPUTS
 %    ImageCellArray: Cell array with images and timestamps of all allocated
 %                    frames.
@@ -27,9 +29,12 @@ function [ImageCellArray, headerInfo] = ReadJpegSEQ(fileName,frames)
 %    Include sequence header information:
 %    [I, headerInfo] = ReadJpegSEQ('C:\test.seq',[1 1])
 % 
-% Last modified 05.11.2021 by Paul Siefert, PhD
-% Goethe-University Frankfurt
-% siefert@bio.uni-frankfurt.de
+%    Read a BrightWay Vision Intensity file:
+%    [I, headerInfo] = ReadJpegSEQ('test.seq',[1 1], 'vendorSpecific',
+%    'BrightWay');
+%
+% Modified 05.11.2021 by Paul Siefert, PhD
+% Goethe-University Frankfurt, siefert@bio.uni-frankfurt.de
 % 
 % Based on the work of Brett Shoelson (Norpix2MATLAB_MarksMod.m)
 % Thanks to NorPix support for providing sequence information.
@@ -39,9 +44,25 @@ function [ImageCellArray, headerInfo] = ReadJpegSEQ(fileName,frames)
 % 8-bit monochrome uncompressed (03.06.2019)
 % 8-bit(24) BGR 75% lossy jpeg compressed (04.10.2021)
 % Code for RGB included but not tested!
-% 
-% Please report any bugs and improvement suggestions!
-% -------------------------------------------------------------------------
+%
+% Adapted for BrightWay file -- D. Cardinal, Stanford University, 2022
+%   Push a vendor-specific format for BrightWay intensity only files
+%   that are tagged as YCC, but have no color info.
+%
+%   Looking at adding true YCC support in case it get used in future.
+%   In the meantime, here are the formulas I've found:
+%{
+  yMult = 298.083 * (Y / 256)
+  Red = yMult + (408.583 * CR / 256) - 222.291
+  Green = yMult - (100.291 * CB / 256) - (208.120 * CR / 256) + 135.576
+  Blue = yMult + (516.412 * CB / 256) - 276.836
+%}
+
+arguments
+    fileName = '';
+    frames = [1 1];
+    options.vendorSpecific = '';
+end
 
 %% Open Sequence & Read Information
 fid = fopen(fileName,'r','b'); % open the sequence
@@ -58,7 +79,16 @@ headerInfo.ImageSizeBytes = imageInfo(5);
 vals = [0,100,101,200:100:600,610,620,700,800,900];
 fmts = {'Unknown','Monochrome','Raw Bayer','BGR','Planar','RGB',...
     'BGRx', 'YUV422', 'YUV422_20', 'YUV422_PPACKED', 'UVY422', 'UVY411', 'UVY444'};
-headerInfo.ImageFormat = fmts{vals == imageInfo(6)};
+
+if ~isempty(options.vendorSpecific)
+    switch options.vendorSpecific
+        case 'BrightWay'
+            headerInfo.ImageFormat = 'BrightWay';
+    end
+else
+    headerInfo.ImageFormat = fmts{vals == imageInfo(6)};
+end
+
 fseek(fid,572,'bof');
 headerInfo.AllocatedFrames = fread(fid,1,'ushort',endianType);
 fseek(fid,620,'bof');
@@ -87,6 +117,8 @@ if strcmp(headerInfo.ImageFormat,'Monochrome')
     fprintf('Proceeding with image format %s.\n', headerInfo.ImageFormat)
 elseif strcmp(headerInfo.ImageFormat,'BGR')
     fprintf('Proceeding with image format %s.\n', headerInfo.ImageFormat)
+elseif strcmp(headerInfo.ImageFormat,'BrightWay')
+    fprintf('Trying BrightWay code...\n');
 else
     fprintf('Current image format (%s) was not tested and may not work! \n', headerInfo.ImageFormat)
     fprintf('Tested: %s\n', ...
@@ -258,9 +290,20 @@ endianType = 'ieee-le';
 
 % read uncompressed image
 fseek(fid,readStart,'bof');
-vec = fread(fid, headerInfo.ImageSizeBytes, bitDepth, endianType);
 
-if strcmp(headerInfo.ImageFormat,'Monochrome')
+if isequal(headerInfo.ImageFormat, 'BrightWay')
+    % Intensity Hack
+    precision = 'uint8';
+    endianType = 'ieee-be';
+    vec = fread(fid, headerInfo.ImageSizeBytes/2, precision, 1);
+else
+    bitDepth = 'uint16';
+    endianType = 'ieee-le';
+    vec = fread(fid, headerInfo.ImageSizeBytes, bitDepth, endianType);
+end
+
+if strcmp(headerInfo.ImageFormat,'Monochrome') ...
+        || strcmp(headerInfo.ImageFormat,'BrightWay')
     I{1,1} = uint8(reshape(vec,headerInfo.ImageWidth,headerInfo.ImageHeight)');
 elseif strcmp(headerInfo.ImageFormat,'BGR')
     B = reshape(vec(1:3:end,1),headerInfo.ImageWidth,headerInfo.ImageHeight)';

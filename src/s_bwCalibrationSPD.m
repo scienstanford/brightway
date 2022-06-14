@@ -59,3 +59,6 @@ xlabel('Wave (nm)');
 ylabel('Spectral radiance');
 grid on
 title('Room')
+
+%%
+load('spd-2022-04-14-13-53-35','data')
