@@ -29,9 +29,9 @@ function [ImageCellArray, headerInfo] = ReadJpegSEQ(fileName,frames,options)
 %    Include sequence header information:
 %    [I, headerInfo] = ReadJpegSEQ('C:\test.seq',[1 1])
 % 
-%    Read a BrightWay Vision Intensity file:
-%    [I, headerInfo] = ReadJpegSEQ('test.seq',[1 1], 'vendorSpecific',
-%    'BrightWay');
+%    Read a BrightWay Vision Intensity file (8 bit) (more examples below):
+%    [I, headerInfo] = ReadJpegSEQ('test8.seq',[1 1], 'vendorSpecific','BrightWay');
+%    ieNewGraphWin; imagesc(I{1})
 %
 % Modified 05.11.2021 by Paul Siefert, PhD
 % Goethe-University Frankfurt, siefert@bio.uni-frankfurt.de
@@ -40,10 +40,10 @@ function [ImageCellArray, headerInfo] = ReadJpegSEQ(fileName,frames,options)
 % Thanks to NorPix support for providing sequence information.
 % 
 % This code was tested with Norpix SEQ
-% 8-bit monochrome 75% lossy jpeg compression (24.07.2018)
-% 8-bit monochrome uncompressed (03.06.2019)
-% 8-bit(24) BGR 75% lossy jpeg compressed (04.10.2021)
-% Code for RGB included but not tested!
+%   8-bit monochrome 75% lossy jpeg compression (24.07.2018)
+%   8-bit monochrome uncompressed (03.06.2019)
+%   8-bit(24) BGR 75% lossy jpeg compressed (04.10.2021)
+%   Code for RGB included but not tested!
 %
 % Adapted for BrightWay file -- D. Cardinal, Stanford University, 2022
 %   Push a vendor-specific format for BrightWay intensity only files
@@ -56,6 +56,36 @@ function [ImageCellArray, headerInfo] = ReadJpegSEQ(fileName,frames,options)
   Red = yMult + (408.583 * CR / 256) - 222.291
   Green = yMult - (100.291 * CB / 256) - (208.120 * CR / 256) + 135.576
   Blue = yMult + (516.412 * CB / 256) - 276.836
+%}
+
+% Examples:
+%{
+    [data, headerInfo] = ReadJpegSEQ('test8.seq',[1 1], 'vendorSpecific','BrightWay');
+    nFrames = headerInfo.AllocatedFrames;
+    fprintf('Found %d frames in the file\n',nFrames);
+    ieNewGraphWin; imagesc(data{1})
+    disp(headerInfo)
+
+    [data, headerInfo] = ReadJpegSEQ('test8.seq',[1 nFrames], 'vendorSpecific','BrightWay');
+    ieNewGraphWin; colormap(gray);
+    for ii=1:2:nFrames
+      imagesc(data{ii}); title(sprintf('%d',ii));
+      pause(0.05);
+    end   
+%}
+%{
+    [data, headerInfo] = ReadJpegSEQ('test10.seq',[1 1], 'vendorSpecific','BrightWay');
+    nFrames = headerInfo.AllocatedFrames;
+    fprintf('Found %d frames in the file\n',nFrames);
+    ieNewGraphWin; imagesc(data{1})
+    disp(headerInfo)
+
+    [data, headerInfo] = ReadJpegSEQ('test8.seq',[1 nFrames], 'vendorSpecific','BrightWay');
+    ieNewGraphWin; colormap(gray);
+    for ii=1:2:nFrames
+      imagesc(data{ii}); title(sprintf('%d',ii));
+      pause(0.05);
+    end 
 %}
 
 arguments
